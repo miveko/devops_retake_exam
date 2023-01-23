@@ -1,0 +1,15 @@
+http://192.168.121.123:9090			: Prometheus								on the monitoring node
+http://192.168.121.123:9090/metrics	: Prometheus								on the monitoring node
+http://192.168.121.123::9093		: Alert Manager								on the monitoring node
+http://192.168.121.123:3000			: Grafana									on the monitoring node
+http://192.168.121.123:9200			: Elasticsearch								on the monitoring node
+http://192.168.121.123:5601			: Kibana									on the monitoring node
+http://192.168.121.123:5044			: Logstash input							on the monitoring node
+	
+http://192.168.121.122:3000			: Gitea										on the containers/application node
+http://192.168.121.122:80XX			: The built application in test mode 		on the containers/application node
+http://192.168.121.122				: The built application in production 		on the containers/application node
+http://192.168.121.122:9100/metrics	: node_exporter								on the containers/application node
+	
+http://192.168.121.121:8080/		: Jenkins									on the pipelines/cicd node
+http://192.168.121.121:9100/metrics	: node_exporter								on the pipelines/cicd node

@@ -1,0 +1,60 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+  config.ssh.insert_key = false
+  
+  config.vm.define "monitoring" do |monitoring|
+    monitoring.vm.box = "shekeriev/debian-11"
+    monitoring.vm.hostname = "monitoring.retake.exam"
+    monitoring.vm.network "private_network", ip: "192.168.121.123"
+	monitoring.vm.synced_folder "filesToCopyOnGuest/", "/vagrant"
+    monitoring.vm.provision "shell", path: "add-hosts.sh"
+    monitoring.vm.provision "shell", path: "add-software.sh"
+    monitoring.vm.provision "shell", path: "provision-scripts/install-and-setup-prometheus-and-grafana.sh"
+#    monitoring.vm.provision "shell", path: "provision-scripts/install-and-setup-elasticstack.sh"
+    monitoring.vm.provider "virtualbox" do |v|
+      v.gui = false
+      v.memory = 4098
+      v.cpus = 2
+    end
+  end
+
+  config.vm.define "containers" do |containers|
+    containers.vm.box = "shekeriev/debian-11"
+    containers.vm.hostname = "containers.retake.exam"
+    containers.vm.network "private_network", ip: "192.168.121.122"
+    containers.vm.network "forwarded_port", guest: 8080, host: 8080
+    containers.vm.synced_folder "filesToCopyOnGuest/", "/vagrant"
+    containers.vm.provision "shell", path: "add-hosts.sh"
+    containers.vm.provision "shell", path: "add-software.sh"
+    containers.vm.provision "shell", path: "docker-setup.sh"
+	containers.vm.provision "shell", path: "provision-scripts/setup_gitea_bat_mitko.sh"
+    containers.vm.provision "shell", path: "install-nodeexporter.sh"
+#    containers.vm.provision "shell", path: "install-metricbeat.sh"
+    containers.vm.provider "virtualbox" do |v|
+      v.gui = false	
+      v.memory = 4098
+      v.cpus = 2
+    end
+  end
+  
+  config.vm.define "pipelines" do |pipelines|
+    pipelines.vm.box = "shekeriev/debian-11"
+    pipelines.vm.hostname = "pipelines.retake.exam"
+    pipelines.vm.network "private_network", ip: "192.168.121.121"
+    pipelines.vm.synced_folder "filesToCopyOnGuest/", "/vagrant"
+    pipelines.vm.provision "shell", path: "add-hosts.sh"
+    pipelines.vm.provision "shell", path: "add-software.sh"
+    pipelines.vm.provision "shell", path: "install-jenkins.sh"
+    pipelines.vm.provision "shell", path: "provision-scripts/setup_jenkins_bat_mitko.sh"
+    pipelines.vm.provision "shell", path: "install-nodeexporter.sh"
+#    pipelines.vm.provision "shell", path: "install-metricbeat.sh"
+    pipelines.vm.provider "virtualbox" do |v|
+      v.gui = false
+      v.memory = 4098
+      v.cpus = 2
+    end
+  end
+  
+end

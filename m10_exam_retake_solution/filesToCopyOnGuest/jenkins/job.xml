@@ -1,0 +1,141 @@
+<?xml version='1.1' encoding='UTF-8'?>
+<flow-definition plugin="workflow-job@1254.v3f64639b_11dd">
+  <actions>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobAction plugin="pipeline-model-definition@2.2118.v31fd5b_9944b_5"/>
+    <org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction plugin="pipeline-model-definition@2.2118.v31fd5b_9944b_5">
+      <jobProperties/>
+      <triggers/>
+      <parameters/>
+      <options/>
+    </org.jenkinsci.plugins.pipeline.modeldefinition.actions.DeclarativeJobPropertyTrackerAction>
+  </actions>
+  <description></description>
+  <keepDependencies>false</keepDependencies>
+  <properties>
+    <com.coravy.hudson.plugins.github.GithubProjectProperty plugin="github@1.36.0">
+      <projectUrl>http://192.168.121.122:3000/vagrant/retake/</projectUrl>
+      <displayName></displayName>
+    </com.coravy.hudson.plugins.github.GithubProjectProperty>
+    <org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+      <triggers>
+        <com.cloudbees.jenkins.GitHubPushTrigger plugin="github@1.36.0">
+          <spec></spec>
+        </com.cloudbees.jenkins.GitHubPushTrigger>
+        <hudson.triggers.SCMTrigger>
+          <spec></spec>
+          <ignorePostCommitHooks>false</ignorePostCommitHooks>
+        </hudson.triggers.SCMTrigger>
+      </triggers>
+    </org.jenkinsci.plugins.workflow.job.properties.PipelineTriggersJobProperty>
+  </properties>
+  <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps@3536.vb_8a_6628079d5">
+    <script>pipeline
+{
+    agent
+    {
+        label &apos;docker&apos;
+    }
+    environment
+    {
+        DOCKERHUB_CREDENTIALS=credentials(&apos;docker-hub&apos;)
+    }
+    stages
+    {
+        stage(&apos;Clone&apos;)
+        {
+            steps
+            {
+                git branch: &apos;main&apos;, url: &apos;http://192.168.121.122:3000/vagrant/retake&apos;
+            }
+        }
+        stage(&apos;Build&apos;)
+        {
+            steps
+            {
+                sh &apos;cd frontend &amp;&amp; docker image build -t img-frontend .&apos;
+                sh &apos;cd backend &amp;&amp; docker image build -t img-backend .&apos;
+                sh &apos;cd database &amp;&amp; docker image build -t img-database .&apos;
+            }
+        }
+        stage(&apos;Network&apos;)
+        {
+            steps
+            {
+                sh &apos;docker network ls | grep retake || docker network create retake&apos;
+
+            }
+        }
+        stage(&apos;Run in test mode&apos;)
+        {
+            steps
+            {
+                sh &apos;docker container rm -f con-frontend || true&apos;
+                sh &apos;docker container run -d --name con-frontend --net retake -p 8080:5000 img-frontend&apos;
+                sh &apos;docker container rm -f con-database  || true&apos;
+                sh &apos;docker container run -d --name con-database --net retake -e MYSQL_ROOT_PASSWORD=\&apos;ExamPa\$\$w0rd\&apos; img-database&apos;
+                sh &apos;docker container rm -f con-backend || true&apos;
+                sh &apos;docker container run -d --name con-backend --net retake img-backend&apos;
+            }
+        }
+        stage(&apos;Test&apos;)
+        {
+            steps
+            {
+                script
+                {
+                    echo &apos;Test isThere - reachability...&apos;
+                    sh &apos;echo $(curl --write-out &quot;%{http_code}&quot; --silent --output /dev/null http://localhost:8080) | grep 200&apos;
+                    echo &apos;Test databaseConnection...&apos;
+                    sh &apos;sleep 10&apos;
+                    sh &apos;curl http://localhost:8080 | grep &quot;No data found yet.&quot; &amp;&amp; echo &quot;Database connection established!&quot; &apos;
+                }
+            }
+        }
+        // stage(&apos;Clean&apos;)
+        // {
+        //     steps
+        //     {
+        //         sh &apos;docker container rm -f con-frontend || true&apos;
+        //         sh &apos;docker container rm -f con-database  || true&apos;
+        //         sh &apos;docker container rm -f con-backend || true&apos;
+        //     }
+        // }
+        stage(&apos;Login in Docker hub&apos;)
+        {
+            steps
+            {
+                sh &apos;echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin&apos;
+            }
+        }
+        stage(&apos;Push/publish to Docker&apos;)
+        {
+            steps
+            {
+                sh &apos;docker image tag img-frontend miveko/img-frontend&apos;
+                sh &apos;docker push miveko/img-frontend&apos;
+                sh &apos;docker image tag img-database miveko/img-database&apos;
+                sh &apos;docker push miveko/img-database&apos;
+                sh &apos;docker image tag img-backend miveko/img-backend&apos;
+                sh &apos;docker push miveko/img-backend&apos;
+            }
+        }
+        stage(&apos;Deploy on Production&apos;)
+        {
+            steps
+            {
+                sh &apos;docker container rm -f con-frontend_prod || true&apos;
+                sh &apos;docker container run -d --name con-frontend_prod --net retake -p 80:5000 -e DB_HOST=con-database_prod miveko/img-frontend&apos;
+                sh &apos;docker container rm -f con-database_prod || true&apos;
+                sh &apos;docker container run -d --name con-database_prod --net retake -e MYSQL_ROOT_PASSWORD=\&apos;ExamPa\$\$w0rd\&apos; miveko/img-database&apos;
+                sh &apos;docker container rm -f con-backend_prod || true&apos;
+                sh &apos;docker container run -d --name con-backend_prod --net retake -e DB_HOST=con-database_prod miveko/img-backend&apos;
+            }
+        }
+    }
+}
+</script>
+    <sandbox>true</sandbox>
+  </definition>
+  <triggers/>
+  <disabled>false</disabled>
+</flow-definition>
